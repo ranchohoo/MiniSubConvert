@@ -92,11 +92,6 @@ export default function Egern_Producer() {
                     normalizeSnellVersion(proxy.version) === null
                 ) {
                     return false;
-                } else if (proxy.type === 'snell' && hasShadowTls(proxy)) {
-                    $.error(
-                        `Platform Egern does not support Snell shadow-tls proxy ${proxy.name}. Proxy has been filtered.`,
-                    );
-                    return false;
                 } else if (
                     ['anytls'].includes(proxy.type) &&
                     proxy.network &&
@@ -552,18 +547,10 @@ export default function Egern_Producer() {
                             'vmess',
                             'anytls',
                             'ssh',
+                            'snell',
                         ].includes(original.type)
                     ) {
-                        if (isPresent(original, 'shadow-tls-password')) {
-                            if (original['shadow-tls-version'] != 3)
-                                throw new Error(
-                                    `shadow-tls version ${original['shadow-tls-version']} is not supported`,
-                                );
-                            proxy.shadow_tls = {
-                                password: original['shadow-tls-password'],
-                                sni: original['shadow-tls-sni'],
-                            };
-                        } else if (
+                        if (
                             ['shadow-tls'].includes(original.plugin) &&
                             original['plugin-opts']
                         ) {
@@ -690,15 +677,6 @@ function getTfo(proxy) {
 
 function getUdpRelay(proxy) {
     return proxy.udp ?? proxy.udp_relay;
-}
-
-function hasShadowTls(proxy) {
-    return (
-        proxy.plugin === 'shadow-tls' ||
-        isPresent(proxy, 'shadow-tls-password') ||
-        isPresent(proxy, 'shadow-tls-sni') ||
-        isPresent(proxy, 'shadow-tls-version')
-    );
 }
 
 function getNonEmptyValue(value) {

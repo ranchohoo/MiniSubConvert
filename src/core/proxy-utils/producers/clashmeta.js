@@ -76,12 +76,17 @@ export default function ClashMeta_Producer() {
                     return false;
                 } else if (
                     hasMihomoShadowTls(proxy) &&
-                    (proxy.type !== 'ss' ||
+                    (!['ss', 'snell'].includes(proxy.type) ||
                         !isSupportedMihomoVersion(
                             getMihomoShadowTlsVersion(proxy),
                             [1, 2, 3],
                         ))
                 ) {
+                    return false;
+                } else if (hasMihomoSnellShadowTlsObfsConflict(proxy)) {
+                    $.error(
+                        `Platform Mihomo does not support Snell shadow-tls with obfs for proxy ${proxy.name}. Proxy has been filtered.`,
+                    );
                     return false;
                 } else if (['juicity', 'naive'].includes(proxy.type)) {
                     return false;
@@ -247,27 +252,29 @@ export default function ClashMeta_Producer() {
                             ds['reality-opts'] = { 'public-key': '' };
                         }
                     }
-                } else if (proxy.type === 'ss') {
-                    if (
-                        isPresent(proxy, 'shadow-tls-password') &&
-                        !isPresent(proxy, 'plugin')
-                    ) {
-                        proxy.plugin = 'shadow-tls';
-                        proxy['plugin-opts'] = {
-                            host: proxy['shadow-tls-sni'],
-                            password: proxy['shadow-tls-password'],
-                            version: proxy['shadow-tls-version'],
-                        };
-                        delete proxy['shadow-tls-password'];
-                        delete proxy['shadow-tls-sni'];
-                        delete proxy['shadow-tls-version'];
-                    }
                 }
 
                 if (isPresent(proxy, 'plugin-opts.mux')) {
                     proxy['plugin-opts'].mux = normalizePluginMuxBooleanValue(
                         proxy['plugin-opts'].mux,
                     );
+                }
+
+                if (proxy.type === 'snell') {
+                    const shadowTLSOpts = getMihomoShadowTlsOpts(proxy);
+                    if (shadowTLSOpts) {
+                        proxy['obfs-opts'] = {
+                            mode: 'shadow-tls',
+                            host: shadowTLSOpts.host,
+                            password: shadowTLSOpts.password,
+                            version: shadowTLSOpts.version,
+                        };
+                        if (shadowTLSOpts.alpn) {
+                            proxy['obfs-opts'].alpn = shadowTLSOpts.alpn;
+                        }
+                        delete proxy.plugin;
+                        delete proxy['plugin-opts'];
+                    }
                 }
 
                 if (
@@ -428,22 +435,29 @@ function isSupportedMihomoVersion(version, supportedVersions) {
 }
 
 function hasMihomoShadowTls(proxy) {
+    return Boolean(getMihomoShadowTlsOpts(proxy));
+}
+
+function hasMihomoSnellShadowTlsObfsConflict(proxy) {
     return (
-        proxy?.plugin === 'shadow-tls' ||
-        isPresent(proxy, 'shadow-tls-password') ||
-        isPresent(proxy, 'shadow-tls-sni') ||
-        isPresent(proxy, 'shadow-tls-version')
+        proxy?.type === 'snell' &&
+        proxy?.plugin === 'shadow-tls' &&
+        (isPresent(proxy, 'obfs-opts.mode') ||
+            isPresent(proxy, 'obfs-opts.host') ||
+            isPresent(proxy, 'obfs-opts.path'))
     );
 }
 
 function getMihomoShadowTlsVersion(proxy) {
-    if (isPresent(proxy, 'shadow-tls-version')) {
-        return proxy['shadow-tls-version'];
-    }
+    return getMihomoShadowTlsOpts(proxy)?.version;
+}
 
-    if (proxy?.plugin === 'shadow-tls') {
-        return proxy?.['plugin-opts']?.version;
+function getMihomoShadowTlsOpts(proxy) {
+    if (proxy?.plugin === 'shadow-tls' && proxy?.['plugin-opts']) {
+        return proxy['plugin-opts'];
     }
-
+    if (proxy?.type === 'snell' && proxy?.['obfs-opts']?.mode === 'shadow-tls') {
+        return proxy['obfs-opts'];
+    }
     return undefined;
 }

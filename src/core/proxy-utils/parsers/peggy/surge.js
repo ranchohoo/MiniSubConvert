@@ -18,6 +18,7 @@ const grammars = String.raw`
 {
     const proxy = {};
     const obfs = {};
+    const shadowTLS = {};
     const $ = {};
 
     function handleWebsocket() {
@@ -31,8 +32,23 @@ const grammars = String.raw`
         }
     }
     function handleShadowTLS() {
-        if (proxy['shadow-tls-password'] && !proxy['shadow-tls-version']) {
-            proxy['shadow-tls-version'] = 2;
+        if (shadowTLS.password && !shadowTLS.version) {
+            shadowTLS.version = 2;
+        }
+        if (shadowTLS.password) {
+            if (shadowTLS.version < 2) {
+                throw new Error("shadow-tls version " + shadowTLS.version + " is not supported");
+            }
+            proxy.plugin = "shadow-tls";
+            proxy["plugin-opts"] = {
+                host: shadowTLS.host,
+                password: shadowTLS.password,
+                version: shadowTLS.version,
+            };
+            if (proxy.alpn) {
+                $set(proxy, "plugin-opts.alpn", proxy.alpn);
+                delete proxy.alpn;
+            }
         }
     }
     function stripQuotes(value) {
@@ -357,7 +373,7 @@ start = (anytls/shadowsocks/vmess/trojan/h2_connect/https/http/snell/socks5/sock
     return proxy;
 }
 
-shadowsocks = tag equals "ss" address (method/passwordk/obfs/obfs_host/obfs_uri/ip_version/underlying_proxy/tos/allow_other_interface/interface/test_url/test_udp/test_timeout/hybrid/no_error_alert/fast_open/tfo/udp_relay/shadow_tls_version/shadow_tls_sni/shadow_tls_password/block_quic/udp_port/others)* {
+shadowsocks = tag equals "ss" address (method/passwordk/obfs/obfs_host/obfs_uri/ip_version/underlying_proxy/tos/allow_other_interface/interface/test_url/test_udp/test_timeout/hybrid/no_error_alert/fast_open/tfo/udp_relay/alpn/shadow_tls_version/shadow_tls_sni/shadow_tls_password/block_quic/udp_port/others)* {
     proxy.type = "ss";
     // handle obfs
     if (obfs.type == "http" || obfs.type === "tls") {
@@ -403,7 +419,7 @@ ssh = tag equals "ssh" address (username password)? (usernamek passwordk)? (serv
     proxy.type = "ssh";
     handleShadowTLS();
 }
-snell = tag equals "snell" address (snell_version/snell_mode/snell_psk/obfs/obfs_host/obfs_uri/ip_version/underlying_proxy/tos/allow_other_interface/interface/test_url/test_udp/test_timeout/hybrid/no_error_alert/fast_open/tfo/udp_relay/reuse/shadow_tls_version/shadow_tls_sni/shadow_tls_password/block_quic/others)* {
+snell = tag equals "snell" address (snell_version/snell_mode/snell_psk/obfs/obfs_host/obfs_uri/ip_version/underlying_proxy/tos/allow_other_interface/interface/test_url/test_udp/test_timeout/hybrid/no_error_alert/fast_open/tfo/udp_relay/reuse/alpn/shadow_tls_version/shadow_tls_sni/shadow_tls_password/block_quic/others)* {
     proxy.type = "snell";
     // handle obfs
     if (obfs.type == "http" || obfs.type === "tls") {
@@ -594,9 +610,9 @@ private_key = comma "private-key" equals match:[^,]+ { proxy["keystore-private-k
 server_fingerprint = comma "server-fingerprint" equals match:[^,]+ { proxy["server-fingerprint"] = match.join("").replace(/^"(.*)"$/, '$1'); }
 block_quic = comma "block-quic" equals match:[^,]+ { proxy["block-quic"] = match.join(""); }
 udp_port = comma "udp-port" equals match:$[0-9]+ { proxy["udp-port"] = parseInt(match.trim()); }
-shadow_tls_version = comma "shadow-tls-version" equals match:$[0-9]+ { proxy["shadow-tls-version"] = parseInt(match.trim()); }
-shadow_tls_sni = comma "shadow-tls-sni" equals match:[^,]+ { proxy["shadow-tls-sni"] = match.join(""); }
-shadow_tls_password = comma "shadow-tls-password" equals match:[^,]+ { proxy["shadow-tls-password"] = match.join("").replace(/^"(.*?)"$/, '$1').replace(/^'(.*?)'$/, '$1'); }
+shadow_tls_version = comma "shadow-tls-version" equals match:$[0-9]+ { shadowTLS.version = parseInt(match.trim()); }
+shadow_tls_sni = comma "shadow-tls-sni" equals match:[^,]+ { shadowTLS.host = match.join(""); }
+shadow_tls_password = comma "shadow-tls-password" equals match:[^,]+ { shadowTLS.password = match.join("").replace(/^"(.*?)"$/, '$1').replace(/^'(.*?)'$/, '$1'); }
 token = comma "token" equals match:[^,]+ { proxy.token = match.join(""); }
 alpn = comma "alpn" equals match:quoted_value {
     const values = parseAlpn(match);
