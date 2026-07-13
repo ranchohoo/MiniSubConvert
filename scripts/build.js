@@ -61,9 +61,19 @@ function prepareBuildWorkspace() {
  *   peggy.generate(grammars);
  */
 function getPeggySourceFiles() {
+    // 同目录允许普通 JavaScript 解析器，仅预编译含嵌入 grammar 的文件。
     const jsFiles = fs
         .readdirSync(PATHS.buildPeggyDir)
-        .filter((fileName) => fileName.endsWith('.js'))
+        .filter(
+            (fileName) =>
+                fileName.endsWith('.js') &&
+                fs
+                    .readFileSync(
+                        path.join(PATHS.buildPeggyDir, fileName),
+                        'utf-8',
+                    )
+                    .includes('String.raw`'),
+        )
         .sort();
 
     if (jsFiles.length === 0) {
@@ -160,12 +170,18 @@ function compilePeggyFromSource(jsFileName) {
  *   from './peggy/surge'  →  from './peggy/generated/surge'
  *   from './peggy/loon'   →  from './peggy/generated/loon'
  */
-function rewriteParserIndexImports() {
-    const PEGGY_IMPORT_RE =
-        /(from\s+['"])\.\/peggy\/(?!generated\/)([^'"]+)(['"])/g;
-
+function rewriteParserIndexImports(sourceFiles) {
     const source = fs.readFileSync(PATHS.buildParsersIndexPath, 'utf-8');
-    const rewritten = source.replace(PEGGY_IMPORT_RE, '$1./peggy/generated/$2$3');
+    let rewritten = source;
+
+    // 只重写实际生成的 Peggy 解析器，保留同目录中的普通 JavaScript 解析器。
+    for (const jsFileName of sourceFiles) {
+        const parserName = path.parse(jsFileName).name;
+        rewritten = rewritten.replaceAll(
+            `./peggy/${parserName}`,
+            `./peggy/generated/${parserName}`,
+        );
+    }
 
     if (rewritten !== source) {
         fs.writeFileSync(PATHS.buildParsersIndexPath, rewritten, 'utf-8');
@@ -187,7 +203,7 @@ function compilePeggyParsers() {
         compilePeggyFromSource(jsFileName);
     }
 
-    rewriteParserIndexImports();
+    rewriteParserIndexImports(sourceFiles);
     console.log(`Generated ${sourceFiles.length} parser modules.`);
 }
 
