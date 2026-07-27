@@ -3,18 +3,6 @@ const peggy = require('peggy');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const CLI_FLAGS = new Set(process.argv.slice(2));
-const SHOULD_BUILD_BUNDLE = !CLI_FLAGS.has('--parsers-only');
-const HELP_TEXT = `Usage: node scripts/build.js [--parsers-only]
-
---parsers-only   Only generate pre-compiled Peggy parsers.
-Without --parsers-only, build dist/minisubconvert.js and dist/proxy-utils.js from .build/src/node.js and .build/src/core/proxy-utils/index.js.`;
-
-if (CLI_FLAGS.has('--help')) {
-    console.log(HELP_TEXT);
-    process.exit(0);
-}
-
 const PATHS = createPaths();
 
 function createPaths() {
@@ -236,11 +224,8 @@ async function buildProxyUtilsBundle() {
 async function main() {
     try {
         compilePeggyParsers();
-
-        if (SHOULD_BUILD_BUNDLE) {
-            await buildNodeBundle();
-            await buildProxyUtilsBundle();
-        }
+        await buildNodeBundle();
+        await buildProxyUtilsBundle();
     } catch (error) {
         console.error('Build failed:', error);
         process.exit(1);

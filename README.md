@@ -24,17 +24,18 @@
 
 ### Worker
 
-1.  **Fork 本仓库**：点击右上角的 `Fork` 按钮，将仓库复制到你的 GitHub 账户下。
+1. 点击右上角的 `Fork` 按钮，将仓库复制到你的 GitHub 账户下。
 
-2.  **设置 GitHub Secrets**：进入你 Fork 后的仓库，依次点击 **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**，添加以下环境变量：
+2. 进入 [Worker](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create) 创建页面
 
-    | Secret 名称 | 说明 |
-    | :--- | :--- |
-    | `SECRET` | 自定义访问密钥（例如 `my-secret-token`） |
-    | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（需具有 Workers 编辑权限） |
-    | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
+3. 选择 `Continue With Github`
 
-3.  **手动运行 Action**：进入 **Actions** 标签页，选择 `Deploy Worker` 工作流，点击 **Run workflow** 按钮执行部署。
+4. 选择Fork的仓库
+
+5. 高级设置->变量名称 新增 `SECRET` 变量(选中加密) 
+
+6. 后续更新只需 Github 中 `Sync fork` 即可
+
 
 接口遵循以下格式：
 
