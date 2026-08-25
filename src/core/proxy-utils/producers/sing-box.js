@@ -401,7 +401,21 @@ const tlsParser = (proxy, parsedProxy) => {
     if (proxy['_client_key']) parsedProxy.tls.client_key = proxy['_client_key'];
     if (proxy['_client_key_path'])
         parsedProxy.tls.client_key_path = proxy['_client_key_path'];
-    if (!parsedProxy.tls.enabled) delete parsedProxy.tls;
+    if (!parsedProxy.tls.enabled) {
+        delete parsedProxy.tls;
+    } else if (
+        (proxy.fingerprint || proxy['tls-fingerprint']) &&
+        !parsedProxy.tls.reality &&
+        !parsedProxy.tls.certificate &&
+        !parsedProxy.tls.certificate_path &&
+        !parsedProxy.tls.certificate_public_key_sha256
+    ) {
+        // sing-box can only pin the SHA-256 of the certificate public key
+        // https://sing-box.sagernet.org/configuration/shared/tls/#certificate_public_key_sha256
+        $.warn(
+            `Platform sing-box does not support certificate fingerprint pinning, it is dropped for proxy ${proxy.name}. Set _certificate_public_key_sha256 to pin the certificate public key instead`,
+        );
+    }
 };
 
 const sshParser = (proxy = {}) => {
@@ -749,6 +763,8 @@ const snellParser = (proxy = {}, includeUnsupportedProxy = false) => {
     if (proxy._userkey) parsedProxy.userkey = proxy._userkey;
     if (outputVersion === 6) {
         if (proxy.mode) parsedProxy.mode = proxy.mode;
+        if (includeUnsupportedProxy && proxy['quic-proxy-mode'])
+            parsedProxy.quic_proxy_mode = !!proxy['quic-proxy-mode'];
     } else {
         if (
             proxy['obfs-opts']?.mode &&
@@ -1073,6 +1089,9 @@ const hysteria2Parser = (proxy = {}) => {
     if (proxy['obfs-password'])
         parsedProxy.obfs.password = proxy['obfs-password'];
     if (!parsedProxy.obfs.type) delete parsedProxy.obfs;
+    if (proxy['bbr-profile']) parsedProxy.bbr_profile = proxy['bbr-profile'];
+    if (proxy['disable-chrome-parrot'])
+        parsedProxy.disable_chrome_parrot = !!proxy['disable-chrome-parrot'];
     networkParser(proxy, parsedProxy);
     tlsParser(proxy, parsedProxy);
     tfoParser(proxy, parsedProxy);
@@ -1115,7 +1134,7 @@ const tuic5Parser = (proxy = {}) => {
     domainResolverParser(proxy, parsedProxy);
     return parsedProxy;
 };
-const anytlsParser = (proxy = {}) => {
+const anytlsParser = (proxy = {}, includeUnsupportedProxy = false) => {
     const parsedProxy = {
         tag: proxy.name,
         type: 'anytls',
@@ -1124,6 +1143,8 @@ const anytlsParser = (proxy = {}) => {
         password: proxy.password,
         tls: { enabled: true, server_name: proxy.server, insecure: false },
     };
+    if (proxy['client-metadata'])
+        parsedProxy.client_metadata = `${proxy['client-metadata']}`;
     if (/^\d+$/.test(proxy['idle-session-check-interval']))
         parsedProxy.idle_session_check_interval = `${proxy['idle-session-check-interval']}s`;
     if (/^\d+$/.test(proxy['idle-session-timeout']))
@@ -1551,7 +1572,12 @@ export default function singbox_Producer() {
                             list.push(wireguardParser(proxy));
                             break;
                         case 'anytls':
-                            list.push(anytlsParser(proxy));
+                            list.push(
+                                anytlsParser(
+                                    proxy,
+                                    opts['include-unsupported-proxy'],
+                                ),
+                            );
                             break;
                         case 'tailscale':
                             list.push(tailscaleParser(proxy));
